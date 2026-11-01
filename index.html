@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TEG Decision Support</title>
+<meta name="description" content="TEG 6s decision-support prototype: FFP, platelet, cryo and TXA pathways for clinician review.">
+<meta name="theme-color" content="#1d2024">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TEG">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: analyser screen on the left (the thing clinicians already know), pathway panel on the right, settings and scope below. */
+:root{
+  --bg:#f3f5f7; --surface:#ffffff; --line:#d9dee4; --fg:#18202a; --muted:#5b6673; --accent:#0b5cad;
+  --trig-bg:#fff1ee; --rev-bg:#fff7e6; --rev:#a85f00; --ok:#2f7d3b;
+  /* analyser screen: deliberately dark in both themes, like the device */
+  --dev-bg:#1d2024; --dev-panel:#26292e; --dev-cell:#2f3338; --dev-line:#3c4148; --dev-fg:#eef1f4; --dev-muted:#99a2ad; --dev-grid:#30353b; --dev-flag:#f08a24;
+  --ck:#e2504a; --crt:#9a5cf0; --ckh:#3fae4f; --cff:#2ba3d9; --txa:#e9a21a;
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12161b; --surface:#1a2027; --line:#2c343e; --fg:#e7ecf1; --muted:#97a3b0; --accent:#6aaef0;
+  --trig-bg:#2c1c1c; --rev-bg:#2b2416; --rev:#f0b45a; --ok:#6cc47a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161b; --surface:#1a2027; --line:#2c343e; --fg:#e7ecf1; --muted:#97a3b0; --accent:#6aaef0;
+  --trig-bg:#2c1c1c; --rev-bg:#2b2416; --rev:#f0b45a; --ok:#6cc47a; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:.01em}
+h1{font-size:2rem;font-weight:700;color:var(--accent);line-height:1.05}
+h2{font-size:1.25rem;font-weight:600}
+.eyebrow{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.09em;font-size:.78rem;color:var(--muted);font-weight:600}
+header{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:flex-end;justify-content:space-between}
+header p{margin:4px 0 0;color:var(--muted);max-width:62ch}
+button{font:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.cases{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.cases .eyebrow{margin-right:4px}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:5px 12px;font-size:.86rem;font-weight:500}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--surface);border-color:var(--accent)}
+
+.main{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:920px){.main{grid-template-columns:1fr}}
+
+/* analyser screen */
+.device{background:var(--dev-bg);color:var(--dev-fg);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.dev-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-size:.8rem;color:var(--dev-muted)}
+.dev-head b{color:var(--dev-fg);font-weight:600}
+.trace{position:relative;width:100%;aspect-ratio:16/7;max-width:100%;background:var(--dev-panel);border-radius:6px}
+.trace canvas{position:absolute;inset:0;width:100%;height:100%}
+.legend{display:flex;gap:6px;flex-wrap:wrap}
+.lg{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--dev-line);background:transparent;color:var(--dev-fg);border-radius:4px;padding:3px 8px;font-size:.78rem;font-family:var(--f-display);letter-spacing:.04em}
+.lg i{width:14px;height:3px;border-radius:2px;display:block}
+.lg[aria-pressed="false"]{opacity:.4}
+.tbl-wrap{overflow-x:auto}
+table.res{border-collapse:separate;border-spacing:3px;width:100%;min-width:320px;font-variant-numeric:tabular-nums}
+.res th{font-family:var(--f-display);font-weight:500;font-size:.78rem;color:var(--dev-muted);text-align:center;padding:2px 4px;line-height:1.1}
+.res th small{display:block;font-size:.7rem;opacity:.85}
+.res td{background:var(--dev-panel);text-align:center;padding:5px 4px 4px;border-radius:3px;vertical-align:top}
+.res td.empty{background:transparent}
+.res td.lbl{color:#fff;font-family:var(--f-display);font-weight:600;font-size:1.05rem;letter-spacing:.04em;width:20%;vertical-align:middle;text-align:center}
+.res td.lbl small{display:block;font-weight:500;font-size:.7rem;opacity:.85;letter-spacing:.02em}
+.cell{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px}
+.cell input{width:100%;max-width:74px;background:var(--dev-cell);border:1px solid transparent;color:var(--dev-fg);border-radius:4px;text-align:center;
+  font-family:var(--f-mono);font-size:1rem;font-weight:600;padding:4px 2px}
+.cell input:hover{border-color:var(--dev-line)}
+.cell input.flag{background:var(--dev-flag);color:#1b1206}
+.cell .rr{font-size:.66rem;color:var(--dev-muted);font-family:var(--f-mono)}
+.cell.key::after{content:"";position:absolute;top:-1px;right:2px;width:6px;height:6px;border-radius:50%;background:var(--dev-fg);opacity:.75}
+.dev-foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:.74rem;color:var(--dev-muted)}
+.dev-foot .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--dev-fg);opacity:.75;margin-right:5px;vertical-align:1px}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--dev-flag);margin-right:5px;vertical-align:-1px}
+
+/* pathways */
+.panel{display:flex;flex-direction:column;gap:10px;min-width:0}
+.verdict{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.verdict .big{font-family:var(--f-display);font-size:1.45rem;font-weight:700;line-height:1.1}
+.verdict p{margin:4px 0 0;color:var(--muted);font-size:.9rem}
+.pw{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 14px;position:relative;overflow:hidden}
+.pw::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--c);opacity:.25}
+.pw .tag{grid-row:span 2;align-self:start;font-family:var(--f-display);font-weight:700;font-size:.82rem;letter-spacing:.05em;color:#fff;background:var(--c);border-radius:4px;padding:3px 7px;min-width:44px;text-align:center;opacity:.45}
+.pw h3{font-size:1.12rem;font-weight:700;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.pw .state{font-family:var(--f-body);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.pw p{margin:0;font-size:.9rem;color:var(--muted)}
+.pw p b{color:var(--fg);font-weight:600}
+.pw.trigger{border-color:var(--c);background:var(--trig-bg)}
+.pw.trigger::before{opacity:1}
+.pw.trigger .tag{opacity:1}
+.pw.trigger .state{background:var(--c);color:#fff;border-color:var(--c)}
+.pw.review{background:var(--rev-bg)}
+.pw.review::before{opacity:.7}
+.pw.review .tag{opacity:.8}
+.pw.review .state{color:var(--rev);border-color:var(--rev)}
+.pw.none .state{color:var(--ok);border-color:var(--ok)}
+.pw.extra{border-style:dashed}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:6px;padding:7px 12px;font-weight:600;font-size:.88rem}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.btn.primary:hover{color:var(--surface);filter:brightness(1.08)}
+#copyNote{font-size:.85rem;color:var(--muted);align-self:center}
+#summaryText{width:100%;min-height:96px;font-family:var(--f-mono);font-size:.8rem;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px}
+
+/* lower sections */
+details{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0 14px}
+summary{cursor:pointer;padding:12px 0;font-family:var(--f-display);font-weight:600;font-size:1.1rem}
+details[open] summary{border-bottom:1px solid var(--line);margin-bottom:10px}
+.refs{border-collapse:collapse;width:100%;min-width:520px;font-variant-numeric:tabular-nums;font-size:.9rem}
+.refs th,.refs td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left}
+.refs th{font-family:var(--f-display);font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-size:.76rem}
+.refs input{width:72px;font-family:var(--f-mono);font-size:.88rem;padding:3px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--fg)}
+.refs .changed input{border-color:var(--rev)}
+.refs-note{color:var(--muted);font-size:.86rem;margin:0 0 10px;max-width:75ch}
+.rules{margin:0 0 14px;padding-left:20px;max-width:80ch}
+.rules li{margin-bottom:6px}
+.scope{font-size:.86rem;color:var(--muted);max-width:90ch;border-left:3px solid var(--rev);padding:4px 0 4px 12px;margin:0}
+.scope b{color:var(--fg)}
+@media (prefers-reduced-motion:no-preference){.pw{transition:background .2s,border-color .2s}}
+@media (max-width:480px){.res td.lbl{font-size:.92rem}.res td.lbl small{display:none}.cell input{font-size:.92rem}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">TEG 6s · Citrated K, KH, RT, FF</div>
+      <h1>TEG Decision Support</h1>
+      <p>Type results into the screen. Pathways update as you go. Orange cells are outside the reference range.</p>
+    </div>
+    <div class="cases" id="cases"><span class="eyebrow">Example cases</span></div>
+  </header>
+
+  <div class="main">
+    <section class="device" aria-label="TEG results screen">
+      <div class="dev-head"><span><b id="caseName">Example case</b> · <span id="caseNote"></span></span>
+        <div class="legend" id="legend"></div></div>
+      <div class="trace"><canvas id="cv" aria-label="TEG tracings drawn from the entered values" role="img"></canvas></div>
+      <div class="tbl-wrap"><table class="res" id="res"></table></div>
+      <div class="dev-foot"><span><span class="dot"></span>drives a pathway &nbsp; <span class="swatch"></span>outside reference range</span><span>Tracing is a schematic drawn from R, K, MA and LY30</span></div>
+    </section>
+
+    <section class="panel" aria-label="Interpretation">
+      <div class="verdict" aria-live="polite"><div class="eyebrow">Automated summary · for clinician review</div><div class="big" id="vBig"></div><p id="vSmall"></p></div>
+      <div id="pathways" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div class="actions">
+        <button class="btn primary" id="copyBtn" type="button">Copy summary</button>
+        <button class="btn" id="clearBtn" type="button">Clear results</button>
+        <span id="copyNote"></span>
+      </div>
+      <textarea id="summaryText" readonly aria-label="Summary text" hidden></textarea>
+    </section>
+  </div>
+
+  <details id="refDetails">
+    <summary>Reference ranges and rules</summary>
+    <p class="refs-note">Ranges are taken from the analyser screenshot and are editable. Changes are kept in this browser only. Check them against your analyser, assay and local protocol.</p>
+    <div class="tbl-wrap"><table class="refs" id="refs"></table></div>
+    <div class="actions" style="margin:10px 0 14px"><button class="btn" id="resetRefs" type="button">Reset ranges to defaults</button></div>
+    <h2 style="margin-bottom:6px">How the pathways are decided</h2>
+    <ol class="rules">
+      <li><b>FFP:</b> CK R above range. If CKH R is entered and within range, the prolonged CK R is flagged as a likely heparin effect instead.</li>
+      <li><b>Cryo / fibrinogen:</b> CFF MA below range.</li>
+      <li><b>Platelets:</b> CRT MA below range <i>and</i> CFF MA entered and within range. If CFF MA is low or missing, platelets are flagged for review only.</li>
+      <li><b>TXA:</b> CK LY30 above range (possible hyperfibrinolysis).</li>
+      <li><b>Heparin effect</b> (addition to the workbook): CK R above range with CKH R within range.</li>
+    </ol>
+  </details>
+
+  <p class="scope"><b>Prototype, not a validated clinical decision rule.</b> It transcribes a teaching diagram and does not prescribe treatment. Interpret alongside bleeding status, clinical findings and other laboratory results. Product choice, dose, contraindications, repeat testing and escalation follow local policy and the responsible clinician. Do not use as the sole basis for transfusion or medication decisions.</p>
+</div>
+
+<script>
+(function(){
+const TESTS=[
+  {id:'CK', sub:'Kaolin', v:'--ck', params:['R','K','MA','LY30']},
+  {id:'CRT',sub:'Rapid TEG', v:'--crt',params:['R','K','MA','LY30']},
+  {id:'CKH',sub:'Kaolin + heparinase', v:'--ckh',params:['R','K','MA']},
+  {id:'CFF',sub:'Functional fibrinogen', v:'--cff',params:['MA']},
+];
+const COLS=[{k:'R',u:'min'},{k:'K',u:'min'},{k:'MA',u:'mm'},{k:'LY30',u:'%'}];
+const KEY={'CK.R':1,'CKH.R':1,'CRT.MA':1,'CFF.MA':1,'CK.LY30':1};
+const DEF_REF={
+  CK:{R:[4.6,9.1],K:[0.8,2.1],MA:[52,69],LY30:[0,2.6]},
+  CRT:{R:[0.3,1.1],K:[0.8,2.7],MA:[52,70],LY30:[0,2.2]},
+  CKH:{R:[4.3,8.3],K:[0.8,1.9],MA:[52,69]},
+  CFF:{MA:[15,32]}
+};
+const CASES=[
+  {n:'Post-bypass bleed',note:'combined coagulopathy',v:{CK:{R:11.2,K:3.1,MA:47,LY30:0.8},CRT:{R:1.5,K:2.9,MA:48,LY30:0.6},CKH:{R:10.6,K:2.8,MA:48},CFF:{MA:11.5}}},
+  {n:'Normal',note:'no triggers',v:{CK:{R:6.4,K:1.3,MA:62.5,LY30:0.4},CRT:{R:0.6,K:1.2,MA:63.1,LY30:0.3},CKH:{R:6.1,K:1.3,MA:62.8},CFF:{MA:20.4}}},
+  {n:'Factor deficiency',note:'R long on CK and CKH',v:{CK:{R:12.8,K:2.6,MA:58.2,LY30:0.5},CRT:{R:1.6,K:2.5,MA:58.9,LY30:0.4},CKH:{R:12.1,K:2.4,MA:58.5},CFF:{MA:17.9}}},
+  {n:'Heparin effect',note:'R corrects with heparinase',v:{CK:{R:19.4,K:4.2,MA:59.6,LY30:0.3},CRT:{R:1.0,K:1.6,MA:61.2,LY30:0.3},CKH:{R:6.9,K:1.4,MA:61.8},CFF:{MA:19.2}}},
+  {n:'Low fibrinogen',note:'CFF MA low',v:{CK:{R:8.1,K:2.7,MA:50.2,LY30:0.6},CRT:{R:0.9,K:2.6,MA:50.8,LY30:0.5},CKH:{R:7.9,K:2.6,MA:50.5},CFF:{MA:8.9}}},
+  {n:'Platelet dysfunction',note:'CRT MA low, CFF normal',v:{CK:{R:7.0,K:2.4,MA:44.3,LY30:0.5},CRT:{R:0.8,K:2.5,MA:45.1,LY30:0.4},CKH:{R:6.8,K:2.3,MA:44.9},CFF:{MA:21.6}}},
+  {n:'Hyperfibrinolysis',note:'LY30 high',v:{CK:{R:6.1,K:1.6,MA:55.8,LY30:14.2},CRT:{R:0.6,K:1.5,MA:56.4,LY30:12.9},CKH:{R:6.0,K:1.5,MA:56.1},CFF:{MA:16.3}}},
+  {n:'Slide example',note:'from the teaching slide',v:{CK:{R:3.3,K:1.0,MA:68.3,LY30:0.0},CRT:{R:0.4,K:0.9,MA:68.0,LY30:0.0},CKH:{R:3.1,K:1.0,MA:68.4},CFF:{MA:28.4}}},
+];
+
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const clone=o=>JSON.parse(JSON.stringify(o));
+let ref=Object.assign(clone(DEF_REF),store.get('teg.ref')||{});
+TESTS.forEach(t=>{ref[t.id]=Object.assign(clone(DEF_REF[t.id]),ref[t.id]||{})});
+let vals={}; let caseIdx=0; let hidden={};
+const saved=store.get('teg.vals');
+function loadCase(i){caseIdx=i;vals={};const c=CASES[i];TESTS.forEach(t=>{vals[t.id]={};t.params.forEach(p=>{const x=c.v[t.id]&&c.v[t.id][p];vals[t.id][p]=x==null?'':String(x)})});}
+if(saved&&saved.vals){vals=saved.vals;caseIdx=saved.caseIdx==null?-1:saved.caseIdx}else loadCase(0);
+
+const $=id=>document.getElementById(id);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const num=(t,p)=>{const s=(vals[t]&&vals[t][p]||'').toString().trim().replace(',','.');if(s==='')return null;const n=parseFloat(s);return isFinite(n)?n:null};
+function status(t,p){const n=num(t,p);if(n==null)return null;const r=ref[t]&&ref[t][p];if(!r)return 'ok';if(n<r[0])return 'low';if(n>r[1])return 'high';return 'ok'}
+const fmt=n=>(Math.round(n*10)/10).toString();
+const rr=(t,p)=>ref[t][p][0]+'–'+ref[t][p][1];
+
+/* ---------- case chips ---------- */
+const casesEl=$('cases');
+CASES.forEach((c,i)=>{const b=document.createElement('button');b.className='chip';b.type='button';b.textContent=c.n;b.id='case'+i;
+  b.onclick=()=>{loadCase(i);renderTable();update()};casesEl.appendChild(b)});
+
+/* ---------- legend ---------- */
+const lgEl=$('legend');
+TESTS.forEach(t=>{const b=document.createElement('button');b.type='button';b.className='lg';b.setAttribute('aria-pressed','true');
+  b.innerHTML='<i style="background:var('+t.v+')"></i>'+t.id;b.onclick=()=>{hidden[t.id]=!hidden[t.id];b.setAttribute('aria-pressed',hidden[t.id]?'false':'true');draw()};lgEl.appendChild(b)});
+
+/* ---------- results table ---------- */
+function renderTable(){
+  let h='<thead><tr><th></th>'+COLS.map(c=>'<th>'+c.k+'<small>('+c.u+')</small></th>').join('')+'</tr></thead><tbody>';
+  TESTS.forEach(t=>{
+    h+='<tr><td class="lbl" style="background:var('+t.v+')">'+t.id+'<small>'+t.sub+'</small></td>';
+    COLS.forEach(c=>{
+      if(t.params.indexOf(c.k)<0){h+='<td class="empty"></td>';return}
+      const id='in-'+t.id+'-'+c.k;
+      h+='<td><div class="cell'+(KEY[t.id+'.'+c.k]?' key':'')+'"><input id="'+id+'" data-t="'+t.id+'" data-p="'+c.k+'" inputmode="decimal" autocomplete="off" aria-label="'+t.id+' '+c.k+' ('+c.u+')" value="'+(vals[t.id][c.k]||'')+'"><span class="rr" id="rr-'+t.id+'-'+c.k+'">'+rr(t.id,c.k)+'</span></div></td>';
+    });
+    h+='</tr>';
+  });
+  $('res').innerHTML=h+'</tbody>';
+  $('res').querySelectorAll('input').forEach(inp=>inp.addEventListener('input',e=>{
+    vals[inp.dataset.t][inp.dataset.p]=inp.value;caseIdx=-1;update();
+  }));
+}
+
+/* ---------- interpretation ---------- */
+function interpret(){
+  const ckR=num('CK','R'),ckhR=num('CKH','R'),crtMA=num('CRT','MA'),cffMA=num('CFF','MA'),ly=num('CK','LY30');
+  const sCkR=status('CK','R'),sCkh=status('CKH','R'),sCrt=status('CRT','MA'),sCff=status('CFF','MA'),sLy=status('CK','LY30');
+  const out={};
+  // FFP + heparin
+  let hep={state:'none',text:'CK R and CKH R do not suggest residual heparin.'};
+  if(ckR==null){out.ffp={state:'pending',text:'Enter <b>CK R</b>.'};hep={state:'pending',text:'Enter <b>CK R</b> and <b>CKH R</b> to compare.'}}
+  else if(sCkR==='high'){
+    if(ckhR!=null&&sCkh!=='high'){
+      out.ffp={state:'review',text:'CK R <b>'+fmt(ckR)+' min</b> is long, but CKH R <b>'+fmt(ckhR)+'</b> is within range. This points to heparin rather than factor deficiency.',sum:'Increased CK R ('+fmt(ckR)+') corrects with heparinase (CKH R '+fmt(ckhR)+'): FFP pathway not triggered; assess heparin effect'};
+      hep={state:'trigger',text:'CK R <b>'+fmt(ckR)+'</b> vs CKH R <b>'+fmt(ckhR)+' min</b>. Review heparin and protamine per local protocol.',sum:'Pattern suggests residual heparin effect (CK R '+fmt(ckR)+' vs CKH R '+fmt(ckhR)+')'};
+    } else {
+      const extra=ckhR==null?' Enter CKH R to exclude a heparin effect.':' Persists with heparinase (CKH R <b>'+fmt(ckhR)+'</b>).';
+      out.ffp={state:'trigger',text:'CK R <b>'+fmt(ckR)+' min</b> above '+ref.CK.R[1]+'. Reduced clotting factor activity.'+extra,sum:'Increased CK R ('+fmt(ckR)+' min): consider FFP pathway'+(ckhR!=null?' (CKH R '+fmt(ckhR)+' also prolonged)':'; CKH R not entered')};
+      if(ckhR==null)hep={state:'pending',text:'Enter <b>CKH R</b> to compare with CK R.'};
+    }
+  } else if(sCkR==='low'){out.ffp={state:'review',text:'CK R <b>'+fmt(ckR)+' min</b> is below range. Review the result.',sum:'CK R below reference range ('+fmt(ckR)+' min): review result'}}
+  else out.ffp={state:'none',text:'CK R <b>'+fmt(ckR)+' min</b> within range.'};
+  // Cryo
+  if(cffMA==null)out.cryo={state:'pending',text:'Enter <b>CFF MA</b>.'};
+  else if(sCff==='low')out.cryo={state:'trigger',text:'CFF MA <b>'+fmt(cffMA)+' mm</b> below '+ref.CFF.MA[0]+'. Reduced fibrinogen contribution to clot strength.',sum:'Decreased CFF MA ('+fmt(cffMA)+' mm): consider cryoprecipitate/fibrinogen pathway'};
+  else out.cryo={state:'none',text:'CFF MA <b>'+fmt(cffMA)+' mm</b> '+(sCff==='high'?'above range.':'within range.')};
+  // Platelets
+  if(crtMA==null)out.plt={state:'pending',text:'Enter <b>CRT MA</b>.'};
+  else if(sCrt==='low'){
+    if(cffMA!=null&&sCff==='ok')out.plt={state:'trigger',text:'CRT MA <b>'+fmt(crtMA)+' mm</b> below '+ref.CRT.MA[0]+' with CFF MA within range. Reduced platelet contribution.',sum:'Decreased CRT MA ('+fmt(crtMA)+' mm) with CFF MA within range: consider platelet pathway'};
+    else out.plt={state:'review',text:'CRT MA <b>'+fmt(crtMA)+' mm</b> is low, but CFF MA is '+(cffMA==null?'not entered':'out of range')+'. Check fibrinogen and the local algorithm before attributing this to platelets.',sum:'Decreased CRT MA ('+fmt(crtMA)+' mm) with CFF MA '+(cffMA==null?'not entered':'out of range')+': check fibrinogen before attributing to platelet dysfunction'};
+  } else out.plt={state:'none',text:'CRT MA <b>'+fmt(crtMA)+' mm</b> '+(sCrt==='high'?'above range.':'within range.')};
+  // TXA
+  if(ly==null)out.txa={state:'pending',text:'Enter <b>CK LY30</b>.'};
+  else if(sLy==='high')out.txa={state:'trigger',text:'CK LY30 <b>'+fmt(ly)+'%</b> above '+ref.CK.LY30[1]+'. Possible hyperfibrinolysis.',sum:'Increased CK LY30 ('+fmt(ly)+'%): consider TXA pathway / assess for hyperfibrinolysis'};
+  else if(sLy==='low')out.txa={state:'review',text:'CK LY30 <b>'+fmt(ly)+'%</b> below range. Review the result.',sum:'CK LY30 below reference range: review result'};
+  else out.txa={state:'none',text:'CK LY30 <b>'+fmt(ly)+'%</b> within range.'};
+  out.hep=hep;
+  return out;
+}
+
+const PW=[
+  {k:'ffp',tag:'CK',v:'--ck',title:'Give FFP',sub:'R time · clotting factors'},
+  {k:'plt',tag:'CRT',v:'--crt',title:'Give platelets',sub:'MA · platelet function'},
+  {k:'cryo',tag:'CFF',v:'--cff',title:'Give cryo / fibrinogen',sub:'MA · fibrinogen'},
+  {k:'txa',tag:'LY30',v:'--txa',title:'Give TXA',sub:'LY30 · fibrinolysis'},
+  {k:'hep',tag:'CKH',v:'--ckh',title:'Heparin effect',sub:'CK R vs CKH R',extra:true},
+];
+const STATE_LABEL={trigger:'Consider',review:'Review',none:'No trigger',pending:'Awaiting'};
+
+function update(){
+  // cell flags
+  TESTS.forEach(t=>t.params.forEach(p=>{const el=$('in-'+t.id+'-'+p);if(!el)return;const s=status(t.id,p);el.classList.toggle('flag',s==='low'||s==='high');
+    const r=$('rr-'+t.id+'-'+p);if(r)r.textContent=rr(t.id,p)}));
+  const out=interpret();
+  $('pathways').innerHTML=PW.map(p=>{const o=out[p.k];return '<div class="pw '+o.state+(p.extra?' extra':'')+'" style="--c:var('+p.v+')"><span class="tag">'+p.tag+'</span><h3>'+p.title+' <span class="state">'+STATE_LABEL[o.state]+'</span></h3><p>'+o.text+'</p></div>'}).join('');
+  const trig=PW.filter(p=>out[p.k].state==='trigger').map(p=>p.title.replace('Give ','').replace(' / fibrinogen','')),rev=PW.filter(p=>out[p.k].state==='review').length,pend=PW.filter(p=>out[p.k].state==='pending').length;
+  $('vBig').textContent=trig.length?('Consider: '+trig.join(' · ')):(rev?'No pathway triggered, '+rev+' to review':(pend===PW.length?'Enter TEG results':'No pathway triggered'));
+  $('vSmall').textContent=(rev&&trig.length?rev+' finding'+(rev>1?'s':'')+' to review. ':'')+(pend?pend+' check'+(pend>1?'s':'')+' waiting for results. ':'')+'Multiple pathways can apply together.';
+  // summary text
+  const lines=PW.map(p=>out[p.k].sum).filter(Boolean);
+  const vstr=TESTS.map(t=>t.id+' '+t.params.map(p=>{const n=num(t.id,p);return n==null?null:p+' '+fmt(n)}).filter(Boolean).join(', ')).filter(s=>s.split(' ').length>1).join('; ');
+  $('summaryText').value='TEG decision support (prototype, for clinician review)\n'+(vstr?'Results: '+vstr+'\n':'')+(lines.length?lines.map(l=>'• '+l).join('\n'):'• No pathway triggered by the entered values')+'\nInterpret with clinical picture and local protocol.';
+  // chips & header
+  document.querySelectorAll('.chip').forEach((b,i)=>b.setAttribute('aria-pressed',i===caseIdx?'true':'false'));
+  $('caseName').textContent=caseIdx>=0?CASES[caseIdx].n:'Entered results';
+  $('caseNote').textContent=caseIdx>=0?'example case, '+CASES[caseIdx].note:'edited by you';
+  store.set('teg.vals',{vals:vals,caseIdx:caseIdx});
+  draw();
+}
+
+/* ---------- tracing ---------- */
+const cv=$('cv'),ctx=cv.getContext('2d');
+const TMAX=60,AMAX=80;
+function amp(t,R,K,MA,LY){
+  if(R==null||MA==null||t<R)return 0;
+  let k=(K!=null&&K>0&&MA>20.5)?-Math.log(1-20/MA)/K:1.1;
+  k=Math.max(0.15,Math.min(k,4));
+  const a=MA*(1-Math.exp(-k*(t-R)));
+  const tMA=R+3/k;
+  const lys=(LY||0)/100*Math.max(0,Math.min((t-tMA)/30,2));
+  return Math.max(0,a*(1-lys));
+}
+function draw(){
+  const r=cv.getBoundingClientRect();if(!r.width)return;
+  const d=window.devicePixelRatio||1;cv.width=r.width*d;cv.height=r.height*d;ctx.setTransform(d,0,0,d,0,0);
+  const W=r.width,H=r.height,pl=34,pr=10,pt=10,pb=22,iw=W-pl-pr,ih=H-pt-pb;
+  const X=t=>pl+t/TMAX*iw, Y=a=>pt+ih/2-a/AMAX*(ih/2);
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle=css('--dev-grid');ctx.lineWidth=1;ctx.fillStyle=css('--dev-muted');ctx.font='10px '+css('--f-mono');
+  ctx.textAlign='center';ctx.textBaseline='top';
+  for(let t=0;t<=TMAX;t+=5){const x=Math.round(X(t))+.5;ctx.beginPath();ctx.moveTo(x,pt);ctx.lineTo(x,pt+ih);ctx.stroke();if(t%10===0&&t<TMAX)ctx.fillText(t,x,pt+ih+5)}
+  ctx.textAlign='right';ctx.textBaseline='middle';
+  for(let a=-AMAX;a<=AMAX;a+=20){const y=Math.round(Y(a))+.5;ctx.beginPath();ctx.moveTo(pl,y);ctx.lineTo(pl+iw,y);ctx.stroke();ctx.fillText(Math.abs(a),pl-5,y)}
+  ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText('mm',2,pt-2);ctx.textAlign='right';ctx.fillText('min',W-pr,pt+ih+5);
+  TESTS.forEach(t=>{
+    if(hidden[t.id])return;
+    let R=num(t.id,'R'),K=num(t.id,'K'),MA=num(t.id,'MA'),LY=num(t.id,'LY30');
+    if(t.id==='CFF'){R=num('CK','R')!=null?num('CK','R')*0.8:5;K=null}
+    if(MA==null||R==null)return;
+    ctx.strokeStyle=css(t.v);ctx.lineWidth=2;
+    [1,-1].forEach(s=>{ctx.beginPath();for(let i=0;i<=300;i++){const tt=i/300*TMAX,y=Y(s*Math.min(amp(tt,R,K,MA,LY),AMAX));i?ctx.lineTo(X(tt),y):ctx.moveTo(X(tt),y)}ctx.stroke()});
+  });
+}
+if(window.ResizeObserver)new ResizeObserver(draw).observe(cv);else addEventListener('resize',draw);
+
+/* ---------- reference editor ---------- */
+function renderRefs(){
+  let h='<thead><tr><th>Test</th><th>Parameter</th><th>Lower</th><th>Upper</th><th>Used for</th></tr></thead><tbody>';
+  const use={'CK.R':'FFP pathway','CKH.R':'Heparin check','CRT.MA':'Platelet pathway','CFF.MA':'Cryo pathway','CK.LY30':'TXA pathway'};
+  TESTS.forEach(t=>t.params.forEach(p=>{const ch=ref[t.id][p][0]!==DEF_REF[t.id][p][0]||ref[t.id][p][1]!==DEF_REF[t.id][p][1];
+    h+='<tr class="'+(ch?'changed':'')+'"><td>'+t.id+'</td><td>'+p+'</td>'+[0,1].map(j=>'<td><input id="ref-'+t.id+'-'+p+'-'+j+'" data-t="'+t.id+'" data-p="'+p+'" data-j="'+j+'" inputmode="decimal" value="'+ref[t.id][p][j]+'" aria-label="'+t.id+' '+p+' '+(j?'upper':'lower')+' limit"></td>').join('')+'<td>'+(use[t.id+'.'+p]||'Display only')+'</td></tr>'}));
+  $('refs').innerHTML=h+'</tbody>';
+  $('refs').querySelectorAll('input').forEach(inp=>inp.addEventListener('change',()=>{
+    const n=parseFloat(inp.value.replace(',','.'));if(!isFinite(n)){inp.value=ref[inp.dataset.t][inp.dataset.p][+inp.dataset.j];return}
+    ref[inp.dataset.t][inp.dataset.p][+inp.dataset.j]=n;store.set('teg.ref',ref);
+    const tr=inp.closest('tr'),t=inp.dataset.t,p=inp.dataset.p;tr.classList.toggle('changed',ref[t][p][0]!==DEF_REF[t][p][0]||ref[t][p][1]!==DEF_REF[t][p][1]);update();
+  }));
+}
+$('resetRefs').onclick=()=>{ref=clone(DEF_REF);store.set('teg.ref',ref);renderRefs();update()};
+
+/* ---------- actions ---------- */
+$('copyBtn').onclick=()=>{const ta=$('summaryText');const done=m=>{$('copyNote').textContent=m};
+  const fallback=()=>{ta.hidden=false;ta.focus();ta.select();done('Copy blocked here. Text is selected below.')};
+  try{navigator.clipboard.writeText(ta.value).then(()=>done('Summary copied'),fallback)}catch(e){fallback()}};
+$('clearBtn').onclick=()=>{TESTS.forEach(t=>t.params.forEach(p=>vals[t.id][p]=''));caseIdx=-1;renderTable();update();$('copyNote').textContent=''};
+
+renderTable();renderRefs();update();
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(draw);
+})();
+</script>
+
+<script>
+if('serviceWorker' in navigator){addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}
+</script>
+</body>
+</html>
