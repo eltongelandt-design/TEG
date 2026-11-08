@@ -450,6 +450,8 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(draw);
 })();
 </script>
 
+<footer class="sim-credit" style="display:block;clear:both;text-align:center;font:500 13px/1.4 system-ui,-apple-system,'Segoe UI',sans-serif;color:inherit;opacity:.75;padding:18px 16px 24px;margin:0">Designed by Elton Gelandt, ECMO Coordinator, with AI-assisted development.</footer>
+
 <script>
 if('serviceWorker' in navigator){addEventListener('load',()=>{navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>{r.update();document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')r.update()})}).catch(()=>{});
   let reloaded=false;const hadController=!!navigator.serviceWorker.controller;
