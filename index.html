@@ -74,7 +74,7 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid
 .lg i{width:14px;height:3px;border-radius:2px;display:block}
 .lg[aria-pressed="false"]{opacity:.4}
 .tbl-wrap{overflow-x:auto}
-table.res{border-collapse:separate;border-spacing:3px;width:100%;min-width:320px;font-variant-numeric:tabular-nums}
+table.res{border-collapse:separate;border-spacing:3px;width:100%;min-width:360px;font-variant-numeric:tabular-nums}
 .res th{font-family:var(--f-display);font-weight:500;font-size:.78rem;color:var(--dev-muted);text-align:center;padding:2px 4px;line-height:1.1}
 .res th small{display:block;font-size:.7rem;opacity:.85}
 .res td{background:var(--dev-panel);text-align:center;padding:5px 4px 4px;border-radius:3px;vertical-align:top}
@@ -175,7 +175,7 @@ details[open] summary{border-bottom:1px solid var(--line);margin-bottom:10px}
         <div class="legend" id="legend"></div></div>
       <div class="trace"><canvas id="cv" aria-label="TEG tracings drawn from the entered values" role="img"></canvas></div>
       <div class="tbl-wrap"><table class="res" id="res"></table></div>
-      <div class="dev-foot"><span><span class="dot"></span>drives a pathway &nbsp; <span class="swatch"></span>outside reference range</span><span>Tracing is a schematic drawn from R, K, MA and LY30</span></div>
+      <div class="dev-foot"><span><span class="dot"></span>drives a pathway &nbsp; <span class="swatch"></span>outside reference range</span><span>Tracing is a schematic drawn from R, K, angle, MA and LY30</span></div>
     </section>
     <section class="meanings" aria-label="What the results mean">
       <h2>What the results mean</h2>
@@ -216,28 +216,29 @@ details[open] summary{border-bottom:1px solid var(--line);margin-bottom:10px}
 <script>
 (function(){
 const TESTS=[
-  {id:'CK', sub:'Kaolin', v:'--ck', params:['R','K','MA','LY30']},
-  {id:'CRT',sub:'Rapid TEG', v:'--crt',params:['R','K','MA','LY30']},
-  {id:'CKH',sub:'Kaolin + heparinase', v:'--ckh',params:['R','K','MA']},
+  {id:'CK', sub:'Kaolin', v:'--ck', params:['R','K','Angle','MA','LY30']},
+  {id:'CRT',sub:'Rapid TEG', v:'--crt',params:['R','K','Angle','MA','LY30']},
+  {id:'CKH',sub:'Kaolin + heparinase', v:'--ckh',params:['R','K','Angle','MA']},
   {id:'CFF',sub:'Functional fibrinogen', v:'--cff',params:['MA']},
 ];
-const COLS=[{k:'R',u:'min'},{k:'K',u:'min'},{k:'MA',u:'mm'},{k:'LY30',u:'%'}];
+const COLS=[{k:'R',u:'min'},{k:'K',u:'min'},{k:'Angle',u:'deg'},{k:'MA',u:'mm'},{k:'LY30',u:'%'}];
 const KEY={'CK.R':1,'CKH.R':1,'CRT.MA':1,'CFF.MA':1,'CK.LY30':1};
 const DEF_REF={
-  CK:{R:[4.6,9.1],K:[0.8,2.1],MA:[52,69],LY30:[0,2.6]},
-  CRT:{R:[0.3,1.1],K:[0.8,2.7],MA:[52,70],LY30:[0,2.2]},
-  CKH:{R:[4.3,8.3],K:[0.8,1.9],MA:[52,69]},
+  CK:{R:[4.6,9.1],K:[0.8,2.1],Angle:[63,78],MA:[52,69],LY30:[0,2.6]},
+  CRT:{R:[0.3,1.1],K:[0.8,2.7],Angle:[60,78],MA:[52,70],LY30:[0,2.2]},
+  CKH:{R:[4.3,8.3],K:[0.8,1.9],Angle:[64,77],MA:[52,69]},
   CFF:{MA:[15,32]}
 };
 const CASES=[
-  {n:'Post-bypass bleed',note:'combined coagulopathy',v:{CK:{R:11.2,K:3.1,MA:47,LY30:0.8},CRT:{R:1.5,K:2.9,MA:48,LY30:0.6},CKH:{R:10.6,K:2.8,MA:48},CFF:{MA:11.5}}},
-  {n:'Normal',note:'no triggers',v:{CK:{R:6.4,K:1.3,MA:62.5,LY30:0.4},CRT:{R:0.6,K:1.2,MA:63.1,LY30:0.3},CKH:{R:6.1,K:1.3,MA:62.8},CFF:{MA:20.4}}},
-  {n:'Factor deficiency',note:'R long on CK and CKH',v:{CK:{R:12.8,K:2.6,MA:58.2,LY30:0.5},CRT:{R:1.6,K:2.5,MA:58.9,LY30:0.4},CKH:{R:12.1,K:2.4,MA:58.5},CFF:{MA:17.9}}},
-  {n:'Heparin effect',note:'R corrects with heparinase',v:{CK:{R:19.4,K:4.2,MA:59.6,LY30:0.3},CRT:{R:1.0,K:1.6,MA:61.2,LY30:0.3},CKH:{R:6.9,K:1.4,MA:61.8},CFF:{MA:19.2}}},
-  {n:'Low fibrinogen',note:'CFF MA low',v:{CK:{R:8.1,K:2.7,MA:50.2,LY30:0.6},CRT:{R:0.9,K:2.6,MA:50.8,LY30:0.5},CKH:{R:7.9,K:2.6,MA:50.5},CFF:{MA:8.9}}},
-  {n:'Platelet dysfunction',note:'CRT MA low, CFF normal',v:{CK:{R:7.0,K:2.4,MA:44.3,LY30:0.5},CRT:{R:0.8,K:2.5,MA:45.1,LY30:0.4},CKH:{R:6.8,K:2.3,MA:44.9},CFF:{MA:21.6}}},
-  {n:'Hyperfibrinolysis',note:'LY30 high',v:{CK:{R:6.1,K:1.6,MA:55.8,LY30:14.2},CRT:{R:0.6,K:1.5,MA:56.4,LY30:12.9},CKH:{R:6.0,K:1.5,MA:56.1},CFF:{MA:16.3}}},
-  {n:'Slide example',note:'from the teaching slide',v:{CK:{R:3.3,K:1.0,MA:68.3,LY30:0.0},CRT:{R:0.4,K:0.9,MA:68.0,LY30:0.0},CKH:{R:3.1,K:1.0,MA:68.4},CFF:{MA:28.4}}},
+  {n:'Post-bypass bleed',note:'combined coagulopathy',v:{CK:{R:11.2,K:3.1,Angle:55.4,MA:47,LY30:0.8},CRT:{R:1.5,K:2.9,Angle:56.8,MA:48,LY30:0.6},CKH:{R:10.6,K:2.8,Angle:56.2,MA:48},CFF:{MA:11.5}}},
+  {n:'Normal',note:'no triggers',v:{CK:{R:6.4,K:1.3,Angle:70.5,MA:62.5,LY30:0.4},CRT:{R:0.6,K:1.2,Angle:72.1,MA:63.1,LY30:0.3},CKH:{R:6.1,K:1.3,Angle:71.0,MA:62.8},CFF:{MA:20.4}}},
+  {n:'Factor deficiency',note:'R long on CK and CKH',v:{CK:{R:12.8,K:2.6,Angle:58.3,MA:58.2,LY30:0.5},CRT:{R:1.6,K:2.5,Angle:60.4,MA:58.9,LY30:0.4},CKH:{R:12.1,K:2.4,Angle:59.1,MA:58.5},CFF:{MA:17.9}}},
+  {n:'Heparin effect',note:'R corrects with heparinase',v:{CK:{R:19.4,K:4.2,Angle:49.6,MA:59.6,LY30:0.3},CRT:{R:1.0,K:1.6,Angle:69.8,MA:61.2,LY30:0.3},CKH:{R:6.9,K:1.4,Angle:70.2,MA:61.8},CFF:{MA:19.2}}},
+  {n:'Run in progress',note:'CK MA not reached yet',v:{CK:{R:46.2,K:8.8,Angle:44.1},CRT:{R:1.1,K:1.3,Angle:73.2,MA:61.4,LY30:0.0},CKH:{R:18.5,K:2.8,Angle:55.6,MA:56.2},CFF:{MA:20.6}}},
+  {n:'Low fibrinogen',note:'CFF MA low',v:{CK:{R:8.1,K:2.7,Angle:57.2,MA:50.2,LY30:0.6},CRT:{R:0.9,K:2.6,Angle:58.0,MA:50.8,LY30:0.5},CKH:{R:7.9,K:2.6,Angle:57.5,MA:50.5},CFF:{MA:8.9}}},
+  {n:'Platelet dysfunction',note:'CRT MA low, CFF normal',v:{CK:{R:7.0,K:2.4,Angle:60.1,MA:44.3,LY30:0.5},CRT:{R:0.8,K:2.5,Angle:61.0,MA:45.1,LY30:0.4},CKH:{R:6.8,K:2.3,Angle:60.6,MA:44.9},CFF:{MA:21.6}}},
+  {n:'Hyperfibrinolysis',note:'LY30 high',v:{CK:{R:6.1,K:1.6,Angle:66.3,MA:55.8,LY30:14.2},CRT:{R:0.6,K:1.5,Angle:67.5,MA:56.4,LY30:12.9},CKH:{R:6.0,K:1.5,Angle:66.8,MA:56.1},CFF:{MA:16.3}}},
+  {n:'Slide example',note:'from the teaching slide',v:{CK:{R:3.3,K:1.0,Angle:75.6,MA:68.3,LY30:0.0},CRT:{R:0.4,K:0.9,Angle:77.8,MA:68.0,LY30:0.0},CKH:{R:3.1,K:1.0,Angle:76.7,MA:68.4},CFF:{MA:28.4}}},
 ];
 
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
@@ -369,35 +370,56 @@ function update(){
 
 /* ---------- tracing ---------- */
 const cv=$('cv'),ctx=cv.getContext('2d');
-const TMAX=60,AMAX=80;
-function amp(t,R,K,MA,LY){
-  if(R==null||MA==null||t<R)return 0;
-  let k=(K!=null&&K>0&&MA>20.5)?-Math.log(1-20/MA)/K:1.1;
-  k=Math.max(0.15,Math.min(k,4));
-  const a=MA*(1-Math.exp(-k*(t-R)));
-  const tMA=R+3/k;
-  const lys=(LY||0)/100*Math.max(0,Math.min((t-tMA)/30,2));
+const AMAX=80, CFF_START=5;   // CFF has no reported R: its clot starts early (about 5 min on the analyser)
+/* Schematic model of one tracing. R sets the start; K (or the angle, if K is blank) sets how fast it rises;
+   MA sets the height. With no MA yet the test is still running, so the curve keeps growing and is labelled. */
+function model(t){
+  let R=num(t.id,'R'),K=num(t.id,'K'),A=num(t.id,'Angle'),MA=num(t.id,'MA'),LY=num(t.id,'LY30');
+  if(t.id==='CFF'){if(MA==null)return null;R=CFF_START}
+  if(R==null)return null;
+  if((K==null||K<=0)&&A!=null&&A>0&&A<89)K=20/(4*Math.tan(A*Math.PI/180));   // estimate K from the angle
+  const running=MA==null;
+  let M=MA;
+  if(running){M=(t.id==='CK'&&num('CKH','MA'))||(ref[t.id]&&ref[t.id].MA?(ref[t.id].MA[0]+ref[t.id].MA[1])/2:60)}
+  let k=(K!=null&&K>0&&M>20.5)?-Math.log(1-20/M)/K:(t.id==='CFF'?0.35:0.3);
+  k=Math.max(0.03,Math.min(k,4));
+  const tMA=R+4/k;
+  const end=running?R+Math.max(15,3*(K||5)):tMA+(LY!=null?30:0);
+  return {R,k,M,LY:running?0:(LY||0),tMA,end,running};
+}
+function amp(t,m){
+  if(t<m.R)return 0;
+  const a=m.M*(1-Math.exp(-m.k*(t-m.R)));
+  const lys=m.running?0:m.LY/100*Math.max(0,Math.min((t-m.tMA)/30,2));
   return Math.max(0,a*(1-lys));
 }
 function draw(){
   const r=cv.getBoundingClientRect();if(!r.width)return;
   const d=window.devicePixelRatio||1;cv.width=r.width*d;cv.height=r.height*d;ctx.setTransform(d,0,0,d,0,0);
   const W=r.width,H=r.height,pl=34,pr=10,pt=10,pb=22,iw=W-pl-pr,ih=H-pt-pb;
+  const models=TESTS.map(t=>({t,m:model(t)})).filter(x=>x.m);
+  const maxEnd=models.reduce((a,x)=>Math.max(a,x.m.end),0);
+  const TMAX=Math.min(120,Math.max(60,Math.ceil(maxEnd/10)*10));
+  const gridStep=TMAX<=60?5:10, labStep=TMAX<=100?10:20;
   const X=t=>pl+t/TMAX*iw, Y=a=>pt+ih/2-a/AMAX*(ih/2);
   ctx.clearRect(0,0,W,H);
   ctx.strokeStyle=css('--dev-grid');ctx.lineWidth=1;ctx.fillStyle=css('--dev-muted');ctx.font='10px '+css('--f-mono');
   ctx.textAlign='center';ctx.textBaseline='top';
-  for(let t=0;t<=TMAX;t+=5){const x=Math.round(X(t))+.5;ctx.beginPath();ctx.moveTo(x,pt);ctx.lineTo(x,pt+ih);ctx.stroke();if(t%10===0&&t<TMAX)ctx.fillText(t,x,pt+ih+5)}
+  for(let t=0;t<=TMAX;t+=gridStep){const x=Math.round(X(t))+.5;ctx.beginPath();ctx.moveTo(x,pt);ctx.lineTo(x,pt+ih);ctx.stroke();if(t%labStep===0&&t<TMAX)ctx.fillText(t,x,pt+ih+5)}
   ctx.textAlign='right';ctx.textBaseline='middle';
   for(let a=-AMAX;a<=AMAX;a+=20){const y=Math.round(Y(a))+.5;ctx.beginPath();ctx.moveTo(pl,y);ctx.lineTo(pl+iw,y);ctx.stroke();ctx.fillText(Math.abs(a),pl-5,y)}
   ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText('mm',2,pt-2);ctx.textAlign='right';ctx.fillText('min',W-pr,pt+ih+5);
-  TESTS.forEach(t=>{
+  models.forEach(({t,m})=>{
     if(hidden[t.id])return;
-    let R=num(t.id,'R'),K=num(t.id,'K'),MA=num(t.id,'MA'),LY=num(t.id,'LY30');
-    if(t.id==='CFF'){R=num('CK','R')!=null?num('CK','R')*0.8:5;K=null}
-    if(MA==null||R==null)return;
-    ctx.strokeStyle=css(t.v);ctx.lineWidth=2;
-    [1,-1].forEach(s=>{ctx.beginPath();for(let i=0;i<=300;i++){const tt=i/300*TMAX,y=Y(s*Math.min(amp(tt,R,K,MA,LY),AMAX));i?ctx.lineTo(X(tt),y):ctx.moveTo(X(tt),y)}ctx.stroke()});
+    const col=css(t.v),tEnd=Math.min(m.end,TMAX),N=400;
+    ctx.strokeStyle=col;ctx.lineWidth=2;
+    [1,-1].forEach(s=>{ctx.beginPath();for(let i=0;i<=N;i++){const tt=i/N*tEnd,y=Y(s*Math.min(amp(tt,m),AMAX));i?ctx.lineTo(X(tt),y):ctx.moveTo(X(tt),y)}ctx.stroke()});
+    if(m.running){
+      const ae=Math.min(amp(tEnd,m),AMAX),x=X(tEnd);
+      ctx.fillStyle=col;ctx.font='600 10px '+css('--f-body');ctx.textBaseline='bottom';
+      const label='MA not reached';const w=ctx.measureText(label).width;
+      ctx.textAlign=(x+w+6<W-pr)?'left':'right';ctx.fillText(label,ctx.textAlign==='left'?x+4:x-4,Y(ae)-3);
+    }
   });
 }
 if(window.ResizeObserver)new ResizeObserver(draw).observe(cv);else addEventListener('resize',draw);
